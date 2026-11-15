@@ -1,0 +1,42 @@
+name: Crawl career pages
+
+on:
+  workflow_dispatch:
+    inputs:
+      limit:
+        description: "How many companies to crawl (0 = all)"
+        default: "200"
+      offset:
+        description: "Skip the first N companies (for chunked runs)"
+        default: "0"
+      dry_run:
+        description: "Dry run (fetch and count only, send nothing)"
+        type: boolean
+        default: true
+  # Turn the daily schedule on later by removing the # signs on the next 2 lines:
+  # schedule:
+  #   - cron: "17 3 * * *"
+
+jobs:
+  crawl:
+    runs-on: ubuntu-latest
+    timeout-minutes: 340
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - run: pip install requests
+      - name: Self-test
+        run: python tests/selftest.py
+      - name: Crawl
+        env:
+          INGEST_TOKEN: ${{ secrets.INGEST_TOKEN }}
+          INGEST_URL: https://careerdrops.com/api/public/ingest-jobs
+        run: |
+          LIMIT="${{ github.event.inputs.limit || '0' }}"
+          OFFSET="${{ github.event.inputs.offset || '0' }}"
+          DRY="${{ github.event.inputs.dry_run || 'false' }}"
+          ARGS="--limit $LIMIT --offset $OFFSET"
+          if [ "$DRY" = "true" ]; then ARGS="$ARGS --dry-run"; fi
+          python crawl.py $ARGS

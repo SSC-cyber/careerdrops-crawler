@@ -1,0 +1,14 @@
+# Company names containing any of these words are skipped (CareerDrops shows direct employer jobs only).
+# One word or phrase per line, lowercase. Add more as you find agencies in the results.
+staffing
+recruit
+headhunt
+talent acquisition
+manpower
+randstad
+adecco
+robert half
+kforce
+insight global
+hays
+michael page
