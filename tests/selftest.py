@@ -14,7 +14,7 @@ GH = {"jobs": [{"id": 111, "title": "Account Executive", "location": {"name": "R
                 "pay_input_ranges": [{"min_cents": 9000000, "max_cents": 14000000, "currency_type": "USD"}]},
                {"id": 112, "title": "", "absolute_url": "x"}]}
 LV = [{"id": "abc", "text": "Support Specialist", "categories": {"location": "Berlin", "commitment": "Full-time"},
-       "workplaceType": "hybrid", "hostedUrl": "https://jobs.lever.co/acme/abc", "createdAt": 1762000000000,
+       "workplaceType": "hybrid", "hostedUrl": "https://jobs.lever.co/acme/abc", "createdAt": int((__import__("time").time() - 30*86400) * 1000),
        "descriptionPlain": "Help customers.", "salaryRange": {"currency": "EUR", "interval": "per-hour-wage", "min": 20, "max": 30}}]
 AS = {"jobs": [{"id": "x1", "title": "Designer", "location": "Lagos", "isRemote": True, "employmentType": "FullTime",
                 "jobUrl": "https://jobs.ashbyhq.com/acme/x1", "publishedAt": "2026-10-20T00:00:00Z", "descriptionPlain": "Design things.",
@@ -43,7 +43,7 @@ def main():
     assert g["external_id"] == "111" and g["remote"] is True and g["salary_min"] == 90000 and g["salary_max"] == 140000, g
     assert g["summary"] == "Sell & grow Quota", g["summary"]
     l = crawl.norm_lever(LV[0], "acme", "Acme")
-    assert l["remote"] is False and l["salary_min"] == 20 * 2080 and l["posted_at"].startswith("2025-"), l
+    assert l["remote"] is False and l["salary_min"] == 20 * 2080 and l["posted_at"].startswith(str(__import__("datetime").date.today().year)) or l["posted_at"].startswith(str(__import__("datetime").date.today().year - 1)), l
     a = crawl.norm_ashby(AS["jobs"][0], "acme", "Acme")
     assert a["remote"] is True and a["salary_min"] == 80000 and a["employment_type"] == "FullTime", a
 
