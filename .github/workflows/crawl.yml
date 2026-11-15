@@ -27,6 +27,14 @@ jobs:
         with:
           python-version: "3.11"
       - run: pip install requests
+      - name: Download company list (LastRound AI ATS Company Directory, CC BY 4.0)
+        run: |
+          if [ ! -f data/ats_directory.csv ]; then
+            curl -fsSL --retry 3 -o data/ats_directory.csv "https://datahub.io/lastroundai-hiring-data/lastroundai-hiring-data/_r/-/ats-directory/lastroundai-ats-company-directory-2026-08.csv" \
+              && echo "Downloaded $(wc -l < data/ats_directory.csv) lines" \
+              || echo "Download failed - falling back to data/seed_companies.csv"
+          fi
+          head -3 data/ats_directory.csv 2>/dev/null || true
       - name: Self-test
         run: python tests/selftest.py
       - name: Crawl
