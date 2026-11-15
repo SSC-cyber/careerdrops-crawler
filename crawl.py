@@ -282,6 +282,7 @@ def process_company(session, comp, ingest_url, token, dry_run, delay):
         res["error"] = f"fetch failed ({status})"
         return res
     jobs = []
+    seen_ids = set()
     for j in raw:
         try:
             n = cfg["norm"](j, comp["slug"], comp["name"])
@@ -289,6 +290,10 @@ def process_company(session, comp, ingest_url, token, dry_run, delay):
             continue
         if not n.get("external_id") or n["external_id"] == "None" or not n.get("title") or not n.get("apply_url"):
             continue
+        n["external_id"] = str(n["external_id"])
+        if n["external_id"] in seen_ids:  # server rejects a batch with repeated IDs
+            continue
+        seen_ids.add(n["external_id"])
         jobs.append(n)
     res["found"] = len(jobs)
     jobs = jobs[:MAX_JOBS_PER_COMPANY]
