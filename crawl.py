@@ -27,6 +27,7 @@ import requests
 
 UA = "CareerDropsBot/1.0 (+https://careerdrops.com; contact@careerdrops.com)"
 DEFAULT_INGEST_URL = "https://careerdrops.com/api/public/ingest-jobs"
+MAX_AGE_DAYS = 180  # skip postings older than this (the site also filters by age)
 MAX_JOBS_PER_COMPANY = 500  # the ingest endpoint expires jobs missing from a request, so one request per company
 HERE = os.path.dirname(os.path.abspath(__file__))
 
@@ -268,6 +269,18 @@ def post_batch(session, url, token, payload, retries=2):
     return False, last
 
 
+def too_old(posted_at):
+    if not posted_at:
+        return False
+    try:
+        dt = datetime.fromisoformat(str(posted_at).replace("Z", "+00:00"))
+        if dt.tzinfo is None:
+            dt = dt.replace(tzinfo=timezone.utc)
+        return (datetime.now(timezone.utc) - dt).days > MAX_AGE_DAYS
+    except Exception:
+        return False
+
+
 def process_company(session, comp, ingest_url, token, dry_run, delay):
     cfg = ATS[comp["ats"]]
     time.sleep(random.random() * delay)
@@ -289,6 +302,8 @@ def process_company(session, comp, ingest_url, token, dry_run, delay):
         except Exception:
             continue
         if not n.get("external_id") or n["external_id"] == "None" or not n.get("title") or not n.get("apply_url"):
+            continue
+        if too_old(n.get("posted_at")):
             continue
         n["external_id"] = str(n["external_id"])
         if n["external_id"] in seen_ids:  # server rejects a batch with repeated IDs
