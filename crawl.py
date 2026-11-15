@@ -323,9 +323,14 @@ def main(argv=None):
     ap.add_argument("--ingest-url", default=os.environ.get("INGEST_URL") or DEFAULT_INGEST_URL)
     args = ap.parse_args(argv)
 
-    token = os.environ.get("INGEST_TOKEN", "")
+    token = os.environ.get("INGEST_TOKEN", "").strip()
     if not args.dry_run and not token:
         print("ERROR: INGEST_TOKEN is not set. Add it as a GitHub secret, or use --dry-run.", file=sys.stderr)
+        return 2
+    if token and not (token.isascii() and token.isprintable()):
+        bad = [f"U+{ord(c):04X}@{i}" for i, c in enumerate(token) if not (c.isascii() and c.isprintable())][:5]
+        print(f"ERROR: INGEST_TOKEN contains characters that are not plain letters/numbers/symbols ({', '.join(bad)}). "
+              "Delete the secret in GitHub and paste it again as plain text.", file=sys.stderr)
         return 2
 
     path = pick_company_file(args.companies)
