@@ -13,9 +13,8 @@ on:
         description: "Dry run (fetch and count only, send nothing)"
         type: boolean
         default: true
-  # Turn the daily schedule on later by removing the # signs on the next 2 lines:
-  # schedule:
-  #   - cron: "17 3 * * *"
+  schedule:
+    - cron: "17 3 * * *"   # daily, 03:17 UTC (04:17 Lagos)
 
 jobs:
   crawl:
