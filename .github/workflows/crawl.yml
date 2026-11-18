@@ -19,7 +19,7 @@ on:
 jobs:
   crawl:
     runs-on: ubuntu-latest
-    timeout-minutes: 340
+    timeout-minutes: 330
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
@@ -40,10 +40,12 @@ jobs:
         env:
           INGEST_TOKEN: ${{ secrets.INGEST_TOKEN }}
           INGEST_URL: https://careerdrops.com/api/public/ingest-jobs
+          PYTHONUNBUFFERED: "1"
         run: |
           LIMIT="${{ github.event.inputs.limit || '0' }}"
           OFFSET="${{ github.event.inputs.offset || '0' }}"
           DRY="${{ github.event.inputs.dry_run || 'false' }}"
-          ARGS="--limit $LIMIT --offset $OFFSET"
+          ARGS="--limit $LIMIT --offset $OFFSET --max-minutes 300"
+          if [ "${{ github.event_name }}" = "schedule" ]; then ARGS="--rotate 3500 --max-minutes 300"; fi
           if [ "$DRY" = "true" ]; then ARGS="$ARGS --dry-run"; fi
           python crawl.py $ARGS

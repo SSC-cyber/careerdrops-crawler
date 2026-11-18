@@ -339,6 +339,10 @@ def main(argv=None):
     ap.add_argument("--offset", type=int, default=0, help="skip the first N companies (to crawl in chunks)")
     ap.add_argument("--workers", type=int, default=8)
     ap.add_argument("--delay", type=float, default=0.3, help="max random pause before each company (seconds)")
+    ap.add_argument("--rotate", type=int, default=0, metavar="N",
+                    help="crawl N companies starting at a position that moves forward every day (wraps around the list), "
+                         "so the whole list is covered over a few days")
+    ap.add_argument("--max-minutes", type=float, default=0, help="stop gracefully after this many minutes (0 = no limit)")
     ap.add_argument("--dry-run", action="store_true", help="fetch and count, but do not send anything")
     ap.add_argument("--ingest-url", default=os.environ.get("INGEST_URL") or DEFAULT_INGEST_URL)
     args = ap.parse_args(argv)
@@ -362,30 +366,45 @@ def main(argv=None):
     before = len(companies)
     companies = [c for c in companies if not any(w in c["name"].lower() for w in agency)]
     skipped_agencies = before - len(companies)
-    companies = companies[args.offset:]
-    if args.limit:
-        companies = companies[: args.limit]
-    print(f"Company list: {path} | companies to crawl: {len(companies)} | agency names skipped: {skipped_agencies} | dry-run: {args.dry_run}")
+    if args.rotate:
+        total = len(companies)
+        start = (datetime.now(timezone.utc).toordinal() * args.rotate) % max(total, 1)
+        companies = (companies + companies)[start:start + min(args.rotate, total)]
+        print(f"Rotating slice: start position {start} of {total}", flush=True)
+    else:
+        companies = companies[args.offset:]
+        if args.limit:
+            companies = companies[: args.limit]
+    started = time.time()
+    deadline = started + args.max_minutes * 60 if args.max_minutes else None
+    print(f"Company list: {path} | companies to crawl: {len(companies)} | agency names skipped: {skipped_agencies} | dry-run: {args.dry_run}", flush=True)
 
     session = requests.Session()
     session.headers.update({"User-Agent": UA, "Accept": "application/json"})
 
-    results, auth_failed = [], False
-    with ThreadPoolExecutor(max_workers=max(1, args.workers)) as pool:
-        futs = {pool.submit(process_company, session, c, args.ingest_url, token, args.dry_run, args.delay): c for c in companies}
-        done = 0
-        for fut in as_completed(futs):
+    results, auth_failed, timed_out = [], False, False
+    pool = ThreadPoolExecutor(max_workers=max(1, args.workers))
+    futs = {pool.submit(process_company, session, c, args.ingest_url, token, args.dry_run, args.delay): c for c in companies}
+    done = 0
+    try:
+        for fut in as_completed(futs, timeout=(max(1, deadline - time.time()) if deadline else None)):
             r = fut.result()
             results.append(r)
             done += 1
             if r.get("auth_failed"):
                 auth_failed = True
-                print("Stopping: the ingest endpoint rejected the password.", file=sys.stderr)
-                for f in futs:
-                    f.cancel()
+                print("Stopping: the ingest endpoint rejected the password.", file=sys.stderr, flush=True)
                 break
-            if done % 50 == 0:
-                print(f"  ...{done}/{len(companies)} companies")
+            if done % 100 == 0:
+                mins = (time.time() - started) / 60
+                bad = sum(1 for x in results if x["error"] and x["error"] != "not found")
+                print(f"  ...{done}/{len(companies)} companies | {mins:.1f} min | failed so far: {bad}", flush=True)
+    except Exception as exc:  # TimeoutError from the time budget
+        timed_out = True
+        print(f"Time budget reached after {done}/{len(companies)} companies - writing the summary.", flush=True)
+    for f in futs:
+        f.cancel()
+    pool.shutdown(wait=False, cancel_futures=True)
 
     # summary
     ok = [r for r in results if not r["error"]]
@@ -415,6 +434,8 @@ def main(argv=None):
         lines.append("- Server counts: " + ", ".join(f"{k} {v}" for k, v in totals.items()))
     for a, v in sorted(by_ats.items()):
         lines.append(f"- {a}: {v['ok']}/{v['companies']} companies ok, {v['jobs']} jobs")
+    if timed_out:
+        lines.append(f"- STOPPED EARLY: time budget reached, {len(companies) - len(results)} companies were not reached")
     samples = [f"{r['company']}: {r['sample']}" for r in ok if r.get("sample")][:5]
     if samples:
         lines.append("- Sample jobs: " + " | ".join(samples))
@@ -429,6 +450,9 @@ def main(argv=None):
     if summ:
         with open(summ, "a", encoding="utf-8") as fh:
             fh.write(text + "\n")
+    if timed_out:  # stuck worker threads would otherwise keep the process alive
+        sys.stdout.flush()
+        os._exit(1 if auth_failed else 0)
     return 1 if auth_failed else 0
 
 
