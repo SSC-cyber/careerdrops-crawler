@@ -1,6 +1,8 @@
 name: Crawl sales jobs for Daily Sales Jobs
 
 on:
+  schedule:
+    - cron: "17 4 * * *"  # 04:17 UTC = 05:17 Lagos, after the CareerDrops run
   workflow_dispatch:
     inputs:
       limit:
@@ -44,6 +46,6 @@ jobs:
           OFFSET="${{ github.event.inputs.offset || '0' }}"
           DRY="${{ github.event.inputs.dry_run || 'false' }}"
           ARGS="--sales-only --limit $LIMIT --offset $OFFSET --max-minutes 300"
-          if [ "${{ github.event_name }}" = "schedule" ]; then ARGS="--sales-only --rotate 3500 --max-minutes 300"; fi
+          if [ "${{ github.event_name }}" = "schedule" ]; then ARGS="--sales-only --max-minutes 300"; fi
           if [ "$DRY" = "true" ]; then ARGS="$ARGS --dry-run"; fi
           python crawl.py $ARGS
