@@ -271,7 +271,7 @@ def post_batch(session, url, token, payload, retries=2):
 
 SALES_INCLUDE = re.compile(
     r"\b(sales|account executive|account manager|account director|sdr|bdr|business development|"
-    r"appointment setter|setter|closer|inside sales|outside sales|outbound|new business|"
+    r"appointment setter|setter|closer|inside sales|outside sales|outbound|new business (?:development|sales|executive|manager|representative|lead)|"
     r"territory manager|revenue (?:executive|representative)|client partner|partnerships? (?:manager|executive))\b",
     re.I)
 SALES_EXCLUDE = re.compile(
