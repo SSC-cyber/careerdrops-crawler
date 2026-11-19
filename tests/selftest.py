@@ -73,6 +73,11 @@ def main():
     os.environ["INGEST_TOKEN"] = "secret"
     rc = crawl.main(["--limit", "5", "--dry-run", "--delay", "0"])
     assert rc == 0
+    for ok_title in ["Account Executive, Enterprise", "Sales Development Representative", "Business Development Manager",
+                     "Appointment Setter (Remote)", "Senior Account Manager"]:
+        assert crawl.is_sales(ok_title), ok_title
+    for bad_title in ["Salesforce Developer", "Sales Operations Analyst", "Software Engineer", "Designer", "Sales Enablement Manager"]:
+        assert not crawl.is_sales(bad_title), bad_title
     print("ALL SELF-TESTS PASSED")
 
 

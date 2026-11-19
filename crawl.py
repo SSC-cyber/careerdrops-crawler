@@ -269,6 +269,22 @@ def post_batch(session, url, token, payload, retries=2):
     return False, last
 
 
+SALES_INCLUDE = re.compile(
+    r"\b(sales|account executive|account manager|account director|sdr|bdr|business development|"
+    r"appointment setter|setter|closer|inside sales|outside sales|outbound|new business|"
+    r"territory manager|revenue (?:executive|representative)|client partner|partnerships? (?:manager|executive))\b",
+    re.I)
+SALES_EXCLUDE = re.compile(
+    r"\b(sales ?(?:operations|ops|enablement|analyst|analytics|systems|tax|support|admin|administrator|coordinator)|"
+    r"salesforce|revops|revenue operations|data analyst|software engineer|developer)\b", re.I)
+SALES_ONLY = False  # set by --sales-only
+
+
+def is_sales(title):
+    t = title or ""
+    return bool(SALES_INCLUDE.search(t)) and not SALES_EXCLUDE.search(t)
+
+
 def too_old(posted_at):
     if not posted_at:
         return False
@@ -310,8 +326,12 @@ def process_company(session, comp, ingest_url, token, dry_run, delay):
             continue
         seen_ids.add(n["external_id"])
         jobs.append(n)
+    if SALES_ONLY:
+        jobs = [j for j in jobs if is_sales(j.get("title"))]
     res["found"] = len(jobs)
     jobs = jobs[:MAX_JOBS_PER_COMPANY]
+    if SALES_ONLY and not jobs:  # nothing to send for this company
+        return res
     if jobs:
         res["sample"] = jobs[0]["title"]
     if dry_run:
@@ -343,10 +363,13 @@ def main(argv=None):
                     help="crawl N companies starting at a position that moves forward every day (wraps around the list), "
                          "so the whole list is covered over a few days")
     ap.add_argument("--max-minutes", type=float, default=0, help="stop gracefully after this many minutes (0 = no limit)")
+    ap.add_argument("--sales-only", action="store_true", help="keep only sales jobs (used for the Daily Sales Jobs site)")
     ap.add_argument("--dry-run", action="store_true", help="fetch and count, but do not send anything")
     ap.add_argument("--ingest-url", default=os.environ.get("INGEST_URL") or DEFAULT_INGEST_URL)
     args = ap.parse_args(argv)
 
+    global SALES_ONLY
+    SALES_ONLY = args.sales_only
     token = os.environ.get("INGEST_TOKEN", "").strip()
     if not args.dry_run and not token:
         print("ERROR: INGEST_TOKEN is not set. Add it as a GitHub secret, or use --dry-run.", file=sys.stderr)
