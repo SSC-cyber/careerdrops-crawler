@@ -285,6 +285,14 @@ def is_sales(title):
     return bool(SALES_INCLUDE.search(t)) and not SALES_EXCLUDE.search(t)
 
 
+def clip(text, limit=480):
+    """Trim to `limit` UTF-16 code units (how JS validators count; emoji count as 2)."""
+    text = text or ""
+    while len(text.encode("utf-16-le")) // 2 > limit:
+        text = text[:-1]
+    return text
+
+
 def too_old(posted_at):
     if not posted_at:
         return False
@@ -322,6 +330,8 @@ def process_company(session, comp, ingest_url, token, dry_run, delay):
         if too_old(n.get("posted_at")):
             continue
         n["external_id"] = str(n["external_id"])
+        n["summary"] = clip(n.get("summary"), 480)
+        n["location"] = clip(n.get("location"), 480)
         if n["external_id"] in seen_ids:  # server rejects a batch with repeated IDs
             continue
         seen_ids.add(n["external_id"])
